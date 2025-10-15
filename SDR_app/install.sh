@@ -1,0 +1,385 @@
+#!/bin/bash
+# SDR_app Installer for Raspberry Pi 2B
+# Optimized for SD boot + USB SSD root + 2x RTL-SDR dongles
+# 
+# This script:
+# - Creates 4GB swap
+# - Installs dependencies in two passes
+# - Builds React frontend once
+# - Installs Python packages with --prefer-binary
+# - Configures static IP interactively
+# - Installs systemd services
+# - Uses resource throttling during install
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+BASE_DIR="/home/pi/SDR_app"
+LOGS_DIR="${BASE_DIR}/logs"
+INSTALL_LOG="${LOGS_DIR}/install.log"
+VENV_DIR="${BASE_DIR}/venv"
+SWAP_SIZE_MB=4096
+
+# Create logs directory
+mkdir -p "$LOGS_DIR"
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$INSTALL_LOG"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR] $1${NC}" | tee -a "$INSTALL_LOG"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS] $1${NC}" | tee -a "$INSTALL_LOG"
+}
+
+log_info() {
+    echo -e "${BLUE}[INFO] $1${NC}" | tee -a "$INSTALL_LOG"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING] $1${NC}" | tee -a "$INSTALL_LOG"
+}
+
+# Error handler
+error_exit() {
+    log_error "$1"
+    exit 1
+}
+
+echo ""
+echo "=========================================="
+echo "    SDR_app Installer for Pi2B"
+echo "=========================================="
+echo ""
+
+log "Installation started"
+
+# Check if running as pi user
+if [ "$(whoami)" != "pi" ]; then
+    error_exit "This script must be run as user 'pi'"
+fi
+
+# Detect current IP
+log_info "Detecting network configuration..."
+DETECTED_IP=$(hostname -I | awk '{print $1}')
+ACTIVE_INTERFACE=$(ip route | grep default | awk '{print $5}' | head -n 1)
+
+if [ -z "$DETECTED_IP" ]; then
+    error_exit "Could not detect IP address. Please check network connection."
+fi
+
+if [ -z "$ACTIVE_INTERFACE" ]; then
+    error_exit "Could not detect active network interface."
+fi
+
+log_info "Detected IP: ${DETECTED_IP} on interface ${ACTIVE_INTERFACE}"
+
+# Interactive IP selection
+echo ""
+echo "=========================================="
+echo "  Network Configuration"
+echo "=========================================="
+echo ""
+echo -e "${BLUE}Detected IP address: ${DETECTED_IP}${NC}"
+echo -e "${BLUE}Active interface: ${ACTIVE_INTERFACE}${NC}"
+echo ""
+read -p "Use this IP address? (y/n): " USE_DETECTED
+
+CHOSEN_IP="$DETECTED_IP"
+
+if [ "$USE_DETECTED" != "y" ] && [ "$USE_DETECTED" != "Y" ]; then
+    while true; do
+        read -p "Enter desired IP address: " CUSTOM_IP
+        
+        # Validate IP format
+        if [[ ! $CUSTOM_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            log_warning "Invalid IP format. Please try again."
+            continue
+        fi
+        
+        # Check if IP is available
+        log_info "Checking if ${CUSTOM_IP} is available..."
+        if ping -c 1 -W 1 "$CUSTOM_IP" &> /dev/null; then
+            log_warning "IP ${CUSTOM_IP} is already in use. Please choose another."
+            continue
+        fi
+        
+        CHOSEN_IP="$CUSTOM_IP"
+        log_success "IP ${CHOSEN_IP} is available"
+        break
+    done
+fi
+
+log_info "Selected IP address: ${CHOSEN_IP}"
+
+# Configure static IP in /etc/dhcpcd.conf
+log_info "Configuring static IP in /etc/dhcpcd.conf..."
+
+# Backup dhcpcd.conf
+sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup.$(date +%s)
+
+# Remove any existing static IP config for this interface
+sudo sed -i "/^interface ${ACTIVE_INTERFACE}/,/^$/d" /etc/dhcpcd.conf
+
+# Get gateway and DNS
+GATEWAY=$(ip route | grep default | awk '{print $3}' | head -n 1)
+DNS_SERVER=$(grep "^nameserver" /etc/resolv.conf | head -n 1 | awk '{print $2}')
+
+if [ -z "$DNS_SERVER" ]; then
+    DNS_SERVER="8.8.8.8"  # Fallback to Google DNS
+fi
+
+# Append static IP configuration
+sudo tee -a /etc/dhcpcd.conf > /dev/null <<EOF
+
+# SDR_app static IP configuration
+interface ${ACTIVE_INTERFACE}
+static ip_address=${CHOSEN_IP}/24
+static routers=${GATEWAY}
+static domain_name_servers=${DNS_SERVER}
+EOF
+
+log_success "Static IP configured: ${CHOSEN_IP}"
+log_info "Network will use this IP on next reboot"
+
+# Print access URLs
+echo ""
+echo "=========================================="
+echo "  Access URLs (after installation)"
+echo "=========================================="
+echo -e "${GREEN}Web UI:      http://${CHOSEN_IP}:8080${NC}"
+echo -e "${GREEN}rtl_tcp:     ${CHOSEN_IP}:1234${NC}"
+echo "=========================================="
+echo ""
+
+# Ensure swap is 4GB
+log_info "Checking swap configuration..."
+CURRENT_SWAP=$(free -m | awk '/^Swap:/ {print $2}')
+
+if [ "$CURRENT_SWAP" -lt "$SWAP_SIZE_MB" ]; then
+    log_info "Current swap: ${CURRENT_SWAP} MB, creating ${SWAP_SIZE_MB} MB swap..."
+    
+    # Turn off existing swap if any
+    sudo dphys-swapfile swapoff 2>/dev/null || true
+    
+    # Configure swap size
+    sudo sed -i "s/^CONF_SWAPSIZE=.*/CONF_SWAPSIZE=${SWAP_SIZE_MB}/" /etc/dphys-swapfile
+    
+    # Setup and start swap
+    sudo dphys-swapfile setup
+    sudo dphys-swapfile swapon
+    
+    log_success "Swap configured: ${SWAP_SIZE_MB} MB"
+else
+    log_success "Swap already configured: ${CURRENT_SWAP} MB"
+fi
+
+# APT update
+log_info "Updating package lists..."
+sudo apt-get update | tee -a "$INSTALL_LOG"
+
+# APT Install - Pass 1: Build tools
+log_info "Installing build tools (Pass 1/2)..."
+nice -n 19 sudo apt-get install -y \
+    build-essential \
+    python3-dev \
+    python3-venv \
+    python3-pip \
+    pkg-config \
+    git \
+    2>&1 | tee -a "$INSTALL_LOG"
+
+log_success "Build tools installed"
+
+# APT Install - Pass 2: Runtime dependencies
+log_info "Installing runtime dependencies (Pass 2/2)..."
+nice -n 19 sudo apt-get install -y \
+    rtl-sdr \
+    librtlsdr-dev \
+    sox \
+    libsox-fmt-all \
+    portaudio19-dev \
+    ffmpeg \
+    jq \
+    logrotate \
+    2>&1 | tee -a "$INSTALL_LOG"
+
+log_success "Runtime dependencies installed"
+
+# Install Node.js 18.x LTS
+log_info "Installing Node.js 18.x LTS..."
+if ! command -v node &> /dev/null; then
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - | tee -a "$INSTALL_LOG"
+    nice -n 19 sudo apt-get install -y nodejs | tee -a "$INSTALL_LOG"
+    log_success "Node.js installed: $(node --version)"
+else
+    log_success "Node.js already installed: $(node --version)"
+fi
+
+# Create Python virtual environment
+log_info "Creating Python virtual environment..."
+if [ ! -d "$VENV_DIR" ]; then
+    python3 -m venv "$VENV_DIR"
+    log_success "Virtual environment created"
+else
+    log_success "Virtual environment already exists"
+fi
+
+# Activate venv
+source "${VENV_DIR}/bin/activate"
+
+# Upgrade pip
+log_info "Upgrading pip..."
+nice -n 19 pip install --upgrade pip | tee -a "$INSTALL_LOG"
+
+# Install Python packages with --prefer-binary
+log_info "Installing Python packages (this may take several minutes)..."
+nice -n 19 pip install --prefer-binary -r "${BASE_DIR}/requirements.txt" 2>&1 | tee -a "$INSTALL_LOG" || {
+    log_warning "Some packages may have failed. Retrying..."
+    nice -n 19 pip install --prefer-binary -r "${BASE_DIR}/requirements.txt" 2>&1 | tee -a "$INSTALL_LOG"
+}
+
+log_success "Python packages installed"
+
+# Build React frontend
+log_info "Building React frontend (this may take several minutes)..."
+cd "${BASE_DIR}/server"
+
+# Install npm dependencies
+log_info "Installing npm dependencies..."
+nice -n 19 ionice -c3 npm ci 2>&1 | tee -a "$INSTALL_LOG"
+
+# Build
+log_info "Building React app..."
+nice -n 19 ionice -c3 npm run build 2>&1 | tee -a "$INSTALL_LOG"
+
+log_success "React app built"
+
+# Copy build to backend static
+log_info "Copying build to backend static directory..."
+mkdir -p "${BASE_DIR}/backend/static"
+rm -rf "${BASE_DIR}/backend/static"/*
+cp -r "${BASE_DIR}/server/dist"/* "${BASE_DIR}/backend/static/"
+
+log_success "Frontend deployed to backend/static"
+
+# Clean up build artifacts to free space
+log_info "Cleaning up build artifacts..."
+rm -rf "${BASE_DIR}/server/node_modules"
+rm -rf "${BASE_DIR}/server/dist"
+
+log_success "Build artifacts cleaned"
+
+# Make scripts executable
+log_info "Making scripts executable..."
+chmod +x "${BASE_DIR}/scripts"/*.sh
+
+# Install systemd services
+log_info "Installing systemd services..."
+
+sudo cp "${BASE_DIR}/services/rtltcp.service" /etc/systemd/system/
+sudo cp "${BASE_DIR}/services/scanner.service" /etc/systemd/system/
+sudo cp "${BASE_DIR}/services/sdr-prune.service" /etc/systemd/system/
+sudo cp "${BASE_DIR}/services/sdr-prune.timer" /etc/systemd/system/
+
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Enable services
+log_info "Enabling systemd services..."
+sudo systemctl enable rtltcp.service
+sudo systemctl enable scanner.service
+sudo systemctl enable sdr-prune.timer
+
+log_success "Systemd services installed and enabled"
+
+# Start services
+log_info "Starting services..."
+sudo systemctl start rtltcp.service
+
+# Wait a moment for rtltcp to start
+sleep 5
+
+sudo systemctl start scanner.service
+
+# Wait for scanner to start
+sleep 5
+
+# Start prune timer
+sudo systemctl start sdr-prune.timer
+
+log_success "Services started"
+
+# Check service status
+log_info "Checking service status..."
+echo ""
+echo "=========================================="
+echo "  Service Status"
+echo "=========================================="
+
+RTLTCP_STATUS=$(systemctl is-active rtltcp.service)
+SCANNER_STATUS=$(systemctl is-active scanner.service)
+
+if [ "$RTLTCP_STATUS" = "active" ]; then
+    echo -e "${GREEN}✓ rtltcp.service: active${NC}"
+else
+    echo -e "${RED}✗ rtltcp.service: ${RTLTCP_STATUS}${NC}"
+    log_warning "rtltcp.service is not active. Check logs with: journalctl -u rtltcp.service -n 50"
+fi
+
+if [ "$SCANNER_STATUS" = "active" ]; then
+    echo -e "${GREEN}✓ scanner.service: active${NC}"
+else
+    echo -e "${RED}✗ scanner.service: ${SCANNER_STATUS}${NC}"
+    log_warning "scanner.service is not active. Check logs with: journalctl -u scanner.service -n 50"
+fi
+
+echo "=========================================="
+echo ""
+
+# Show recent logs if services failed
+if [ "$RTLTCP_STATUS" != "active" ]; then
+    log_warning "rtltcp.service logs:"
+    sudo journalctl -u rtltcp.service -n 20 --no-pager | tee -a "$INSTALL_LOG"
+fi
+
+if [ "$SCANNER_STATUS" != "active" ]; then
+    log_warning "scanner.service logs:"
+    sudo journalctl -u scanner.service -n 20 --no-pager | tee -a "$INSTALL_LOG"
+fi
+
+# Final summary
+echo ""
+echo "=========================================="
+echo "  Installation Complete!"
+echo "=========================================="
+echo ""
+log_success "Installation completed successfully!"
+echo ""
+echo "Access URLs:"
+echo -e "  ${GREEN}Web UI:      http://${CHOSEN_IP}:8080${NC}"
+echo -e "  ${GREEN}rtl_tcp:     ${CHOSEN_IP}:1234${NC}"
+echo ""
+echo "Useful commands:"
+echo "  Check status:      sudo systemctl status rtltcp scanner"
+echo "  View logs:         tail -f ${LOGS_DIR}/backend.log"
+echo "  Run diagnostics:   ${BASE_DIR}/scripts/diagnostics.sh"
+echo "  Restart services:  sudo systemctl restart rtltcp scanner"
+echo ""
+echo "Installation log: ${INSTALL_LOG}"
+echo ""
+echo "=========================================="
+echo ""
+
+log "Installation script completed"
