@@ -1,0 +1,236 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard-header h2 {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.ip-badge {
+  padding: 0.5rem 1rem;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  font-family: 'Space Grotesk', monospace;
+  font-weight: 600;
+  color: #60a5fa;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.status-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.status-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 10px;
+  color: #60a5fa;
+}
+
+.status-info {
+  flex: 1;
+}
+
+.status-info h3 {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin-bottom: 0.25rem;
+}
+
+.alert-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.alert-card svg {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.alert-card strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #f87171;
+}
+
+.alert-card p {
+  font-size: 0.875rem;
+  color: #cbd5e1;
+}
+
+.resources-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.resource-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.resource-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #94a3b8;
+}
+
+.resource-header h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.resource-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.meter-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.meter-label span:first-child {
+  color: #94a3b8;
+}
+
+.value {
+  font-weight: 600;
+  font-family: 'Space Grotesk', monospace;
+}
+
+.value-success { color: #4ade80; }
+.value-warning { color: #fbbf24; }
+.value-danger { color: #f87171; }
+
+.meter-bar {
+  height: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  transition: width 0.5s ease, background-color 0.3s ease;
+  border-radius: 9999px;
+}
+
+.meter-fill-success {
+  background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
+}
+
+.meter-fill-warning {
+  background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+.meter-fill-danger {
+  background: linear-gradient(90deg, #f87171 0%, #ef4444 100%);
+}
+
+.resource-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+}
+
+.resource-details div {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+}
+
+.resource-details div:last-child {
+  border-bottom: none;
+}
+
+.resource-details span:first-child {
+  color: #94a3b8;
+}
+
+.resource-details span:last-child {
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.statistics-card h3 {
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stat-label {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #60a5fa;
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .status-grid,
+  .resources-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
