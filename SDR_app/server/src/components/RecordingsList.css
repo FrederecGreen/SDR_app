@@ -1,0 +1,156 @@
+.recordings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.recordings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.recordings-header h2 {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.recordings-stats {
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.recordings-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 1rem;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  gap: 1rem;
+}
+
+.empty-state svg {
+  color: #475569;
+}
+
+.empty-state h3 {
+  font-size: 1.25rem;
+  color: #e2e8f0;
+}
+
+.empty-state p {
+  color: #94a3b8;
+}
+
+.recordings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1rem;
+}
+
+.recording-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.recording-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.recording-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recording-freq {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1.125rem;
+  font-family: 'Space Grotesk', monospace;
+  color: #60a5fa;
+}
+
+.recording-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recording-label {
+  font-weight: 600;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+}
+
+.recording-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.recording-meta > div {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+}
+
+.recording-meta > div:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.meta-label {
+  color: #94a3b8;
+}
+
+.meta-value {
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.recording-codes {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.recording-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.recording-actions button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 768px) {
+  .recordings-grid {
+    grid-template-columns: 1fr;
+  }
+}
