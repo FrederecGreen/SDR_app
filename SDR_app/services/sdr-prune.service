@@ -1,0 +1,11 @@
+[Unit]
+Description=SDR Storage Pruning Service
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/SDR_app
+ExecStart=/home/pi/SDR_app/scripts/prune_storage.sh
+StandardOutput=append:/home/pi/SDR_app/logs/prune.log
+StandardError=append:/home/pi/SDR_app/logs/prune.log

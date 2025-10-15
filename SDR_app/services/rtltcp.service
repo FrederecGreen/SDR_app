@@ -1,0 +1,25 @@
+[Unit]
+Description=RTL-SDR TCP Server (Device 0)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/SDR_app
+Environment="PYTHONUNBUFFERED=1"
+
+# rtl_tcp on device 0, port 1234, listen on all interfaces
+ExecStart=/usr/bin/rtl_tcp -a 0.0.0.0 -p 1234 -d 0
+
+# Restart policy
+Restart=always
+RestartSec=3
+
+# Logging
+StandardOutput=append:/home/pi/SDR_app/logs/rtltcp.log
+StandardError=append:/home/pi/SDR_app/logs/rtltcp.log
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,27 @@
+[Unit]
+Description=SDR Scanner Service (Device 1)
+After=network.target rtltcp.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/SDR_app
+Environment="PYTHONUNBUFFERED=1"
+Environment="PATH=/home/pi/SDR_app/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Wait for rtltcp to start, then start scanner
+ExecStartPre=/bin/sleep 10
+ExecStart=/home/pi/SDR_app/venv/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port 8080
+
+# Restart policy (on-failure to avoid restart loops)
+Restart=on-failure
+RestartSec=3
+
+# Logging
+StandardOutput=append:/home/pi/SDR_app/logs/backend.log
+StandardError=append:/home/pi/SDR_app/logs/backend.log
+
+[Install]
+WantedBy=multi-user.target
