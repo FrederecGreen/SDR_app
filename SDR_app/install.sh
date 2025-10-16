@@ -310,11 +310,41 @@ fi
 # Install Node.js 18.x LTS
 log_info "Installing Node.js 18.x LTS..."
 if ! command -v node &> /dev/null; then
-    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - | tee -a "$INSTALL_LOG"
-    nice -n 19 sudo apt-get install -y nodejs | tee -a "$INSTALL_LOG"
-    log_success "Node.js installed: $(node --version)"
+    log_info "Downloading NodeSource setup script..."
+    if curl -fsSL https://deb.nodesource.com/setup_18.x -o /tmp/node_setup.sh 2>&1 | tee -a "$INSTALL_LOG"; then
+        if sudo -E bash /tmp/node_setup.sh 2>&1 | tee -a "$INSTALL_LOG"; then
+            if nice -n 19 sudo apt-get install -y nodejs 2>&1 | tee -a "$INSTALL_LOG"; then
+                log_success "Node.js installed: $(node --version 2>/dev/null || echo 'version unknown')"
+            else
+                log_error "Failed to install Node.js"
+                error_exit "Node.js is required for building the frontend"
+            fi
+        else
+            log_error "Failed to set up NodeSource repository"
+            error_exit "Cannot install Node.js"
+        fi
+        rm -f /tmp/node_setup.sh
+    else
+        log_error "Failed to download NodeSource setup script"
+        log_info "Attempting to install nodejs from default repositories..."
+        if sudo apt-get install -y nodejs npm 2>&1 | tee -a "$INSTALL_LOG"; then
+            log_success "Node.js installed from default repos: $(node --version 2>/dev/null || echo 'version unknown')"
+        else
+            error_exit "Failed to install Node.js"
+        fi
+    fi
 else
-    log_success "Node.js already installed: $(node --version)"
+    NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
+    log_success "Node.js already installed: ${NODE_VERSION}"
+fi
+
+# Verify node and npm are available
+if ! command -v node &> /dev/null; then
+    error_exit "node command not found after installation"
+fi
+if ! command -v npm &> /dev/null; then
+    log_warning "npm not found - attempting to install..."
+    sudo apt-get install -y npm 2>&1 | tee -a "$INSTALL_LOG" || log_warning "npm install failed"
 fi
 
 # Create Python virtual environment
