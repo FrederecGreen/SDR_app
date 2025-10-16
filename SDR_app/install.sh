@@ -251,16 +251,27 @@ fi
 
 # APT Install - Pass 1: Build tools
 log_info "Installing build tools (Pass 1/2)..."
-nice -n 19 sudo apt-get install -y \
+if nice -n 19 sudo apt-get install -y \
     build-essential \
     python3-dev \
     python3-venv \
     python3-pip \
     pkg-config \
     git \
-    2>&1 | tee -a "$INSTALL_LOG"
+    2>&1 | tee -a "$INSTALL_LOG"; then
+    log_success "Build tools installed"
+else
+    log_error "Failed to install some build tools"
+    log_info "Attempting to continue..."
+fi
 
-log_success "Build tools installed"
+# Verify critical tools
+if ! command -v python3 &> /dev/null; then
+    error_exit "python3 not found - cannot continue"
+fi
+if ! command -v git &> /dev/null; then
+    log_warning "git not installed - some features may not work"
+fi
 
 # APT Install - Pass 2: Runtime dependencies
 log_info "Installing runtime dependencies (Pass 2/2)..."
