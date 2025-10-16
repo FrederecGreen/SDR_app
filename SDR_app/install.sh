@@ -195,26 +195,46 @@ echo -e "${GREEN}rtl_tcp:     ${CHOSEN_IP}:1234${NC}"
 echo "=========================================="
 echo ""
 
-# Ensure swap is 4GB
+# Ensure swap is 4GB - check if dphys-swapfile is available
 log_info "Checking swap configuration..."
-CURRENT_SWAP=$(free -m | awk '/^Swap:/ {print $2}')
+CURRENT_SWAP=$(free -m 2>/dev/null | awk '/^Swap:/ {print $2}')
 
-if [ "$CURRENT_SWAP" -lt "$SWAP_SIZE_MB" ]; then
-    log_info "Current swap: ${CURRENT_SWAP} MB, creating ${SWAP_SIZE_MB} MB swap..."
-    
-    # Turn off existing swap if any
-    sudo dphys-swapfile swapoff 2>/dev/null || true
-    
-    # Configure swap size
-    sudo sed -i "s/^CONF_SWAPSIZE=.*/CONF_SWAPSIZE=${SWAP_SIZE_MB}/" /etc/dphys-swapfile
-    
-    # Setup and start swap
-    sudo dphys-swapfile setup
-    sudo dphys-swapfile swapon
-    
-    log_success "Swap configured: ${SWAP_SIZE_MB} MB"
+if [ -z "$CURRENT_SWAP" ]; then
+    CURRENT_SWAP=0
+fi
+
+if command -v dphys-swapfile &> /dev/null && [ -f /etc/dphys-swapfile ]; then
+    if [ "$CURRENT_SWAP" -lt "$SWAP_SIZE_MB" ]; then
+        log_info "Current swap: ${CURRENT_SWAP} MB, creating ${SWAP_SIZE_MB} MB swap..."
+        
+        # Turn off existing swap if any
+        sudo dphys-swapfile swapoff 2>/dev/null || true
+        
+        # Configure swap size
+        if sudo sed -i "s/^CONF_SWAPSIZE=.*/CONF_SWAPSIZE=${SWAP_SIZE_MB}/" /etc/dphys-swapfile 2>/dev/null; then
+            # Setup and start swap
+            if sudo dphys-swapfile setup 2>&1 | tee -a "$INSTALL_LOG" && \
+               sudo dphys-swapfile swapon 2>&1 | tee -a "$INSTALL_LOG"; then
+                log_success "Swap configured: ${SWAP_SIZE_MB} MB"
+            else
+                log_warning "Failed to configure swap with dphys-swapfile"
+                log_info "Installation will continue - ensure you have enough RAM"
+            fi
+        else
+            log_warning "Could not modify /etc/dphys-swapfile"
+        fi
+    else
+        log_success "Swap already configured: ${CURRENT_SWAP} MB"
+    fi
 else
-    log_success "Swap already configured: ${CURRENT_SWAP} MB"
+    log_warning "dphys-swapfile not found - skipping swap configuration"
+    log_warning "Current swap: ${CURRENT_SWAP} MB"
+    if [ "$CURRENT_SWAP" -lt 2048 ]; then
+        log_warning "WARNING: Low swap space may cause build failures!"
+        log_info "Consider creating swap manually or ensure sufficient RAM"
+        echo ""
+        read -p "Press Enter to continue anyway, or Ctrl+C to abort..."
+    fi
 fi
 
 # APT update
