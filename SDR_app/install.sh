@@ -466,21 +466,62 @@ chmod +x "${BASE_DIR}/scripts"/*.sh
 # Install systemd services
 log_info "Installing systemd services..."
 
-sudo cp "${BASE_DIR}/services/rtltcp.service" /etc/systemd/system/
-sudo cp "${BASE_DIR}/services/scanner.service" /etc/systemd/system/
-sudo cp "${BASE_DIR}/services/sdr-prune.service" /etc/systemd/system/
-sudo cp "${BASE_DIR}/services/sdr-prune.timer" /etc/systemd/system/
+# Check if systemd is available
+if ! command -v systemctl &> /dev/null; then
+    log_error "systemctl not found - systemd is required"
+    error_exit "This installer requires systemd"
+fi
+
+# Check if service files exist
+SERVICE_FILES=("rtltcp.service" "scanner.service" "sdr-prune.service" "sdr-prune.timer")
+MISSING_SERVICES=()
+
+for service in "${SERVICE_FILES[@]}"; do
+    if [ ! -f "${BASE_DIR}/services/${service}" ]; then
+        MISSING_SERVICES+=("${service}")
+    fi
+done
+
+if [ ${#MISSING_SERVICES[@]} -gt 0 ]; then
+    log_error "Missing service files: ${MISSING_SERVICES[*]}"
+    error_exit "Service files not found"
+fi
+
+# Copy service files
+for service in "${SERVICE_FILES[@]}"; do
+    if sudo cp "${BASE_DIR}/services/${service}" /etc/systemd/system/ 2>&1 | tee -a "$INSTALL_LOG"; then
+        log_info "Installed ${service}"
+    else
+        log_error "Failed to install ${service}"
+        error_exit "Service installation failed"
+    fi
+done
 
 # Reload systemd
-sudo systemctl daemon-reload
+if sudo systemctl daemon-reload 2>&1 | tee -a "$INSTALL_LOG"; then
+    log_success "Systemd reloaded"
+else
+    log_warning "systemctl daemon-reload had warnings"
+fi
 
 # Enable services
 log_info "Enabling systemd services..."
-sudo systemctl enable rtltcp.service
-sudo systemctl enable scanner.service
-sudo systemctl enable sdr-prune.timer
+FAILED_ENABLE=()
 
-log_success "Systemd services installed and enabled"
+for service in rtltcp.service scanner.service sdr-prune.timer; do
+    if sudo systemctl enable "${service}" 2>&1 | tee -a "$INSTALL_LOG"; then
+        log_info "Enabled ${service}"
+    else
+        log_warning "Failed to enable ${service}"
+        FAILED_ENABLE+=("${service}")
+    fi
+done
+
+if [ ${#FAILED_ENABLE[@]} -eq 0 ]; then
+    log_success "Systemd services installed and enabled"
+else
+    log_warning "Some services failed to enable: ${FAILED_ENABLE[*]}"
+fi
 
 # Start services
 log_info "Starting services..."
