@@ -350,14 +350,32 @@ fi
 # Create Python virtual environment
 log_info "Creating Python virtual environment..."
 if [ ! -d "$VENV_DIR" ]; then
-    python3 -m venv "$VENV_DIR"
-    log_success "Virtual environment created"
+    if python3 -m venv "$VENV_DIR" 2>&1 | tee -a "$INSTALL_LOG"; then
+        log_success "Virtual environment created"
+    else
+        log_error "Failed to create virtual environment"
+        log_info "Attempting to install python3-venv..."
+        if sudo apt-get install -y python3-venv 2>&1 | tee -a "$INSTALL_LOG"; then
+            if python3 -m venv "$VENV_DIR" 2>&1 | tee -a "$INSTALL_LOG"; then
+                log_success "Virtual environment created after installing python3-venv"
+            else
+                error_exit "Failed to create virtual environment"
+            fi
+        else
+            error_exit "Cannot create virtual environment"
+        fi
+    fi
 else
     log_success "Virtual environment already exists"
 fi
 
 # Activate venv
-source "${VENV_DIR}/bin/activate"
+if [ -f "${VENV_DIR}/bin/activate" ]; then
+    source "${VENV_DIR}/bin/activate"
+    log_info "Virtual environment activated"
+else
+    error_exit "Virtual environment activation script not found"
+fi
 
 # Upgrade pip
 log_info "Upgrading pip..."
