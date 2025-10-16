@@ -424,9 +424,17 @@ else
     NPM_CI_EXIT=$?
     log_warning "npm ci failed (exit code: $NPM_CI_EXIT), trying npm install..."
     
+    # Remove package-lock.json and node_modules as suggested by npm
+    log_info "Cleaning up for fresh install..."
+    rm -rf node_modules package-lock.json
+    
     # Fallback to npm install
     if nice -n 19 $IONICE_CMD npm install 2>&1 | tee -a "$INSTALL_LOG"; then
         log_success "npm dependencies installed with npm install"
+        
+        # Try to explicitly install ARM rollup binary for 32-bit Pi
+        log_info "Installing ARM-specific rollup binary..."
+        nice -n 19 npm install --save-optional @rollup/rollup-linux-arm-gnueabihf 2>&1 | tee -a "$INSTALL_LOG" || log_warning "Could not install ARM rollup binary"
     else
         log_error "Failed to install npm dependencies"
         log_error "Check ${INSTALL_LOG} for details"
