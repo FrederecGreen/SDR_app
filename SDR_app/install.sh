@@ -137,25 +137,28 @@ fi
 
 log_info "Selected IP address: ${CHOSEN_IP}"
 
-# Configure static IP in /etc/dhcpcd.conf
-log_info "Configuring static IP in /etc/dhcpcd.conf..."
-
-# Backup dhcpcd.conf
-sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup.$(date +%s)
-
-# Remove any existing static IP config for this interface
-sudo sed -i "/^interface ${ACTIVE_INTERFACE}/,/^$/d" /etc/dhcpcd.conf
-
-# Get gateway and DNS
-GATEWAY=$(ip route | grep default | awk '{print $3}' | head -n 1)
-DNS_SERVER=$(grep "^nameserver" /etc/resolv.conf | head -n 1 | awk '{print $2}')
-
-if [ -z "$DNS_SERVER" ]; then
-    DNS_SERVER="8.8.8.8"  # Fallback to Google DNS
-fi
-
-# Append static IP configuration
-sudo tee -a /etc/dhcpcd.conf > /dev/null <<EOF
+# Configure static IP - check if dhcpcd.conf exists
+if [ -f /etc/dhcpcd.conf ]; then
+    log_info "Configuring static IP in /etc/dhcpcd.conf..."
+    
+    # Backup dhcpcd.conf
+    if sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup.$(date +%s) 2>/dev/null; then
+        log_info "Backed up dhcpcd.conf"
+    fi
+    
+    # Remove any existing static IP config for this interface
+    sudo sed -i "/^interface ${ACTIVE_INTERFACE}/,/^$/d" /etc/dhcpcd.conf 2>/dev/null
+    
+    # Get gateway and DNS
+    GATEWAY=$(ip route | grep default | awk '{print $3}' | head -n 1)
+    DNS_SERVER=$(grep "^nameserver" /etc/resolv.conf 2>/dev/null | head -n 1 | awk '{print $2}')
+    
+    if [ -z "$DNS_SERVER" ]; then
+        DNS_SERVER="8.8.8.8"  # Fallback to Google DNS
+    fi
+    
+    # Append static IP configuration
+    if sudo tee -a /etc/dhcpcd.conf > /dev/null <<EOF
 
 # SDR_app static IP configuration
 interface ${ACTIVE_INTERFACE}
@@ -163,9 +166,24 @@ static ip_address=${CHOSEN_IP}/24
 static routers=${GATEWAY}
 static domain_name_servers=${DNS_SERVER}
 EOF
-
-log_success "Static IP configured: ${CHOSEN_IP}"
-log_info "Network will use this IP on next reboot"
+    then
+        log_success "Static IP configured: ${CHOSEN_IP}"
+        log_info "Network will use this IP on next reboot"
+    else
+        log_warning "Failed to configure static IP"
+    fi
+else
+    log_warning "dhcpcd.conf not found - skipping static IP configuration"
+    log_warning "Your system may be using NetworkManager or systemd-networkd"
+    log_info "Current IP (${CHOSEN_IP}) will be used, but may change on reboot"
+    log_info "You can configure static IP manually after installation if needed"
+    echo ""
+    echo "To configure static IP manually, see:"
+    echo "  - NetworkManager: nmtui or nmcli"
+    echo "  - systemd-networkd: /etc/systemd/network/*.network files"
+    echo ""
+    read -p "Press Enter to continue installation..."
+fi
 
 # Print access URLs
 echo ""
