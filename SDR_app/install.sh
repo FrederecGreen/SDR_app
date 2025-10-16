@@ -58,6 +58,19 @@ error_exit() {
     exit 1
 }
 
+# Safe command execution with fallback
+safe_execute() {
+    local cmd="$1"
+    local fallback_msg="$2"
+    
+    if eval "$cmd"; then
+        return 0
+    else
+        log_warning "$fallback_msg"
+        return 1
+    fi
+}
+
 echo ""
 echo "=========================================="
 echo "    SDR_app Installer for Pi2B"
