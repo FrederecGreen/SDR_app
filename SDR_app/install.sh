@@ -392,17 +392,57 @@ log_success "Python packages installed"
 
 # Build React frontend
 log_info "Building React frontend (this may take several minutes)..."
+
+# Check if server directory exists
+if [ ! -d "${BASE_DIR}/server" ]; then
+    log_error "Server directory not found: ${BASE_DIR}/server"
+    error_exit "Frontend source files missing"
+fi
+
 cd "${BASE_DIR}/server"
+
+# Check if package.json exists
+if [ ! -f "package.json" ]; then
+    log_error "package.json not found in server directory"
+    error_exit "Frontend configuration missing"
+fi
 
 # Install npm dependencies
 log_info "Installing npm dependencies..."
-nice -n 19 ionice -c3 npm ci 2>&1 | tee -a "$INSTALL_LOG"
+if command -v ionice &> /dev/null; then
+    IONICE_CMD="ionice -c3"
+else
+    IONICE_CMD=""
+    log_warning "ionice not available - skipping IO priority setting"
+fi
+
+if nice -n 19 $IONICE_CMD npm ci 2>&1 | tee -a "$INSTALL_LOG"; then
+    log_success "npm dependencies installed"
+else
+    log_warning "npm ci failed, trying npm install..."
+    if nice -n 19 $IONICE_CMD npm install 2>&1 | tee -a "$INSTALL_LOG"; then
+        log_success "npm dependencies installed with npm install"
+    else
+        log_error "Failed to install npm dependencies"
+        error_exit "Frontend build cannot proceed"
+    fi
+fi
 
 # Build
 log_info "Building React app..."
-nice -n 19 ionice -c3 npm run build 2>&1 | tee -a "$INSTALL_LOG"
+if nice -n 19 $IONICE_CMD npm run build 2>&1 | tee -a "$INSTALL_LOG"; then
+    log_success "React app built"
+else
+    log_error "React build failed"
+    log_warning "Check logs for details"
+    error_exit "Frontend build failed"
+fi
 
-log_success "React app built"
+# Verify build output exists
+if [ ! -d "dist" ]; then
+    log_error "Build output directory (dist) not found"
+    error_exit "React build did not produce expected output"
+fi
 
 # Copy build to backend static
 log_info "Copying build to backend static directory..."
