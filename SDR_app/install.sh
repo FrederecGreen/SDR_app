@@ -275,7 +275,7 @@ fi
 
 # APT Install - Pass 2: Runtime dependencies
 log_info "Installing runtime dependencies (Pass 2/2)..."
-nice -n 19 sudo apt-get install -y \
+if nice -n 19 sudo apt-get install -y \
     rtl-sdr \
     librtlsdr-dev \
     sox \
@@ -284,9 +284,28 @@ nice -n 19 sudo apt-get install -y \
     ffmpeg \
     jq \
     logrotate \
-    2>&1 | tee -a "$INSTALL_LOG"
+    2>&1 | tee -a "$INSTALL_LOG"; then
+    log_success "Runtime dependencies installed"
+else
+    log_warning "Some runtime dependencies failed to install"
+    log_info "Checking critical components..."
+fi
 
-log_success "Runtime dependencies installed"
+# Verify critical runtime dependencies
+MISSING_DEPS=()
+command -v rtl_fm &> /dev/null || MISSING_DEPS+=("rtl-sdr")
+command -v ffmpeg &> /dev/null || MISSING_DEPS+=("ffmpeg")
+command -v sox &> /dev/null || MISSING_DEPS+=("sox")
+
+if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
+    log_warning "Missing critical dependencies: ${MISSING_DEPS[*]}"
+    log_warning "Scanner functionality will be limited without these"
+    echo ""
+    read -p "Continue anyway? (y/n): " CONTINUE
+    if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
+        error_exit "Installation aborted by user"
+    fi
+fi
 
 # Install Node.js 18.x LTS
 log_info "Installing Node.js 18.x LTS..."
