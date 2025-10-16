@@ -437,13 +437,16 @@ set +o pipefail
 
 # Build
 log_info "Building React app..."
+set -o pipefail
 if nice -n 19 $IONICE_CMD npm run build 2>&1 | tee -a "$INSTALL_LOG"; then
     log_success "React app built"
 else
-    log_error "React build failed"
-    log_warning "Check logs for details"
+    BUILD_EXIT=$?
+    log_error "React build failed (exit code: $BUILD_EXIT)"
+    log_error "Check ${INSTALL_LOG} for details"
     error_exit "Frontend build failed"
 fi
+set +o pipefail
 
 # Verify build output exists
 if [ ! -d "dist" ]; then
