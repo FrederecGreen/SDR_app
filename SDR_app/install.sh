@@ -3,15 +3,16 @@
 # Optimized for SD boot + USB SSD root + 2x RTL-SDR dongles
 # 
 # This script:
-# - Creates 4GB swap
+# - Creates 4GB swap (if swap tools available)
 # - Installs dependencies in two passes
 # - Builds React frontend once
 # - Installs Python packages with --prefer-binary
-# - Configures static IP interactively
+# - Configures static IP interactively (if dhcpcd available)
 # - Installs systemd services
 # - Uses resource throttling during install
 
-set -e
+# Don't exit on error - we'll handle errors gracefully
+set +e
 
 # Colors for output
 RED='\033[0;31m'
