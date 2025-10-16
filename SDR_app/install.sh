@@ -237,9 +237,17 @@ else
     fi
 fi
 
-# APT update
+# APT update - check if apt-get is available
 log_info "Updating package lists..."
-sudo apt-get update | tee -a "$INSTALL_LOG"
+if command -v apt-get &> /dev/null; then
+    if sudo apt-get update 2>&1 | tee -a "$INSTALL_LOG"; then
+        log_success "Package lists updated"
+    else
+        log_warning "apt-get update had warnings, continuing..."
+    fi
+else
+    error_exit "apt-get not found - this installer requires a Debian-based system"
+fi
 
 # APT Install - Pass 1: Build tools
 log_info "Installing build tools (Pass 1/2)..."
