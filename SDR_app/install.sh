@@ -525,20 +525,37 @@ fi
 
 # Start services
 log_info "Starting services..."
-sudo systemctl start rtltcp.service
+
+# Start rtltcp
+if sudo systemctl start rtltcp.service 2>&1 | tee -a "$INSTALL_LOG"; then
+    log_info "rtltcp.service start command issued"
+else
+    log_warning "Failed to start rtltcp.service"
+fi
 
 # Wait a moment for rtltcp to start
+log_info "Waiting for rtltcp to initialize..."
 sleep 5
 
-sudo systemctl start scanner.service
+# Start scanner
+if sudo systemctl start scanner.service 2>&1 | tee -a "$INSTALL_LOG"; then
+    log_info "scanner.service start command issued"
+else
+    log_warning "Failed to start scanner.service"
+fi
 
 # Wait for scanner to start
+log_info "Waiting for scanner to initialize..."
 sleep 5
 
 # Start prune timer
-sudo systemctl start sdr-prune.timer
+if sudo systemctl start sdr-prune.timer 2>&1 | tee -a "$INSTALL_LOG"; then
+    log_info "sdr-prune.timer started"
+else
+    log_warning "Failed to start sdr-prune.timer"
+fi
 
-log_success "Services started"
+log_success "Service start commands completed"
 
 # Check service status
 log_info "Checking service status..."
