@@ -416,17 +416,24 @@ else
     log_warning "ionice not available - skipping IO priority setting"
 fi
 
+# Try npm ci first (requires package-lock.json)
+set -o pipefail  # Make pipe return the exit code of the first failing command
 if nice -n 19 $IONICE_CMD npm ci 2>&1 | tee -a "$INSTALL_LOG"; then
     log_success "npm dependencies installed"
 else
-    log_warning "npm ci failed, trying npm install..."
+    NPM_CI_EXIT=$?
+    log_warning "npm ci failed (exit code: $NPM_CI_EXIT), trying npm install..."
+    
+    # Fallback to npm install
     if nice -n 19 $IONICE_CMD npm install 2>&1 | tee -a "$INSTALL_LOG"; then
         log_success "npm dependencies installed with npm install"
     else
         log_error "Failed to install npm dependencies"
+        log_error "Check ${INSTALL_LOG} for details"
         error_exit "Frontend build cannot proceed"
     fi
 fi
+set +o pipefail
 
 # Build
 log_info "Building React app..."
