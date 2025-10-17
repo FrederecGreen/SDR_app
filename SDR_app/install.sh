@@ -143,6 +143,12 @@ VENV_DIR="${BASE_DIR}/venv"
 # Recreate logs directory in case we moved
 mkdir -p "$LOGS_DIR"
 
+# Ensure proper ownership after potential directory moves
+if [ -d "$BASE_DIR" ]; then
+    log_info "Setting ownership of ${BASE_DIR} to pi:pi"
+    chown -R pi:pi "$BASE_DIR" 2>/dev/null || true
+fi
+
 log_info "Base directory set to: ${BASE_DIR}"
 
 # Verify required files and directories exist
