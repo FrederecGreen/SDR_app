@@ -307,6 +307,40 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     fi
 fi
 
+# Configure RTL-SDR udev rules for non-root access
+log_info "Configuring RTL-SDR device permissions..."
+if sudo tee /etc/udev/rules.d/20-rtlsdr.rules > /dev/null <<'UDEVRULES'
+# RTL-SDR devices - allow access for all users
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2832", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idProduct}=="2838", ATTRS{idVendor}=="0bda", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", GROUP="plugdev", MODE="0660"
+UDEVRULES
+then
+    log_success "udev rules created"
+    
+    # Reload udev rules
+    if sudo udevadm control --reload-rules 2>&1 | tee -a "$INSTALL_LOG"; then
+        log_info "udev rules reloaded"
+    fi
+    
+    # Trigger udev to apply rules to existing devices
+    if sudo udevadm trigger 2>&1 | tee -a "$INSTALL_LOG"; then
+        log_info "udev rules applied to devices"
+    fi
+    
+    # Add pi user to plugdev group if not already
+    if groups pi | grep -q plugdev; then
+        log_info "User pi already in plugdev group"
+    else
+        if sudo usermod -a -G plugdev pi 2>&1 | tee -a "$INSTALL_LOG"; then
+            log_success "Added user pi to plugdev group"
+            log_warning "You may need to log out and back in for group changes to take effect"
+        fi
+    fi
+else
+    log_warning "Failed to create udev rules - RTL-SDR devices may require manual permission setup"
+fi
+
 # Install Node.js 18.x LTS
 log_info "Installing Node.js 18.x LTS..."
 if ! command -v node &> /dev/null; then
