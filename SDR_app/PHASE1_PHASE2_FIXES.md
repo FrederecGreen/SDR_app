@@ -181,7 +181,7 @@ cd /home/pi/SDR_app
 3. Check for signal detections
 4. Monitor backend logs: `sudo tail -f /home/pi/SDR_app/logs/backend.log`
 
-### 4. Expected Behavior
+### 5. Expected Behavior
 When scanning a known FM broadcast (e.g., 98.1 MHz):
 ```
 [INFO] Scanning 98.1 MHz (mode: wbfm, rate: 200k, squelch: 0)
