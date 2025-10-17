@@ -170,10 +170,12 @@ cd /home/pi/SDR_app
 ./scripts/test_devices.sh
 
 # Should complete without hanging
-# Should show device 1 is accessible
+# Should show:
+# ✓ Device 1 accessible via rtl_fm
+# ✓ Test file created (audio pipeline working)
 ```
 
-### 3. Test Scanner via UI
+### 4. Test Scanner via UI
 1. Access UI in browser
 2. Start scanner with any frequency group (e.g., FM Broadcast)
 3. Check for signal detections
