@@ -435,6 +435,38 @@ else
     log_warning "Failed to create udev rules - RTL-SDR devices may require manual permission setup"
 fi
 
+# Blacklist DVB-T kernel modules that conflict with RTL-SDR
+log_info "Blacklisting DVB-T kernel modules to prevent conflicts..."
+if sudo tee /etc/modprobe.d/blacklist-rtl-sdr.conf > /dev/null <<'BLACKLIST'
+# Blacklist DVB-T drivers that conflict with RTL-SDR tools
+# These modules claim the USB device and prevent rtl_fm/rtl_tcp from accessing it
+blacklist dvb_usb_rtl28xxu
+blacklist rtl2832
+blacklist rtl2830
+BLACKLIST
+then
+    log_success "Kernel module blacklist created"
+    
+    # Update initramfs to apply blacklist on boot
+    log_info "Updating initramfs (this may take a minute)..."
+    if sudo update-initramfs -u 2>&1 | tee -a "$INSTALL_LOG"; then
+        log_success "initramfs updated"
+        log_warning "Blacklist will take effect after reboot"
+    else
+        log_warning "Failed to update initramfs - blacklist may not persist across reboots"
+    fi
+    
+    # Unload modules immediately if loaded
+    for module in dvb_usb_rtl28xxu rtl2832 rtl2830; do
+        if lsmod | grep -q "^$module"; then
+            log_info "Unloading module: $module"
+            sudo rmmod "$module" 2>&1 | tee -a "$INSTALL_LOG" || log_warning "Could not unload $module (may not be an issue)"
+        fi
+    done
+else
+    log_warning "Failed to create kernel module blacklist"
+fi
+
 # Install Node.js 18.x LTS
 log_info "Installing Node.js 18.x LTS..."
 if ! command -v node &> /dev/null; then
