@@ -2,6 +2,7 @@
 
 **Date:** January 2025
 **Status:** Ready for testing on Raspberry Pi 2B
+**Updated:** Added kernel module blacklist to installer
 
 ---
 
