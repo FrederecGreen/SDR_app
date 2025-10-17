@@ -100,6 +100,42 @@ pkill -KILL -f "rtl_fm.*-d 1.*-f $TEST_FREQ" 2>/dev/null || true
 
 ---
 
+## Phase 2.5: Add Kernel Module Blacklist to Installer
+
+### Problem
+DVB-T kernel modules (`dvb_usb_rtl28xxu`, `rtl2832`, `rtl2830`) automatically claim RTL-SDR devices when they're plugged in, preventing rtl_fm and other SDR tools from accessing them. This causes:
+- `usb_claim_interface error -6` when trying to use the devices
+- Audio pipeline failures
+- Scanner unable to record
+
+### Fix Applied
+**File:** `/app/SDR_app/install.sh`
+
+Added automatic kernel module blacklisting during installation:
+
+```bash
+# Creates /etc/modprobe.d/blacklist-rtl-sdr.conf with:
+blacklist dvb_usb_rtl28xxu
+blacklist rtl2832
+blacklist rtl2830
+
+# Updates initramfs to persist across reboots
+# Immediately unloads modules if currently loaded
+```
+
+**Benefits:**
+- Installer now handles this automatically
+- No manual intervention needed
+- Modules are unloaded during install if present
+- Blacklist persists across reboots via initramfs
+
+### Impact
+✅ RTL-SDR devices accessible to rtl_fm/rtl_tcp immediately after reboot
+✅ No more USB claim errors
+✅ Scanner can function properly
+
+---
+
 ## Testing Recommendations
 
 ### 1. Test the Scanner Backend
