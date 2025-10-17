@@ -64,7 +64,6 @@ class SignalDetector:
             )
             
             # Read output for 1 second
-            import time
             start_time = time.time()
             output_data = b""
             
