@@ -145,6 +145,33 @@ mkdir -p "$LOGS_DIR"
 
 log_info "Base directory set to: ${BASE_DIR}"
 
+# Verify required files and directories exist
+log_info "Verifying installation files..."
+REQUIRED_FILES=(
+    "requirements.txt"
+    "backend/app/main.py"
+    "server/package.json"
+    "services/rtltcp.service"
+    "services/scanner.service"
+)
+
+MISSING_FILES=()
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "${BASE_DIR}/${file}" ]; then
+        MISSING_FILES+=("${file}")
+    fi
+done
+
+if [ ${#MISSING_FILES[@]} -gt 0 ]; then
+    log_error "Missing required files:"
+    for file in "${MISSING_FILES[@]}"; do
+        log_error "  - ${file}"
+    done
+    error_exit "Installation cannot proceed - required files missing. Please check your clone."
+fi
+
+log_success "All required files present"
+
 # Detect current IP
 log_info "Detecting network configuration..."
 DETECTED_IP=$(hostname -I | awk '{print $1}')
