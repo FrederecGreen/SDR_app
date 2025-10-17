@@ -138,7 +138,22 @@ blacklist rtl2830
 
 ## Testing Recommendations
 
-### 1. Test the Scanner Backend
+### Important: Reboot Required
+After installation, **reboot the Pi** to ensure kernel module blacklist takes effect:
+```bash
+sudo reboot
+```
+
+### 1. Verify Blacklist (after reboot)
+```bash
+# Check that DVB modules are NOT loaded
+lsmod | grep -E "rtl|dvb"
+
+# Should show NO dvb_usb_rtl28xxu, rtl2832, or rtl2830
+# May show rtl2832_sdr (this is OK - it's the SDR driver)
+```
+
+### 2. Test the Scanner Backend
 ```bash
 # Check if backend starts without errors
 sudo supervisorctl restart backend
