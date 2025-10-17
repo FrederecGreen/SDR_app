@@ -109,11 +109,18 @@ chmod +x install.sh
 1. **Interactive IP selection**: Detects LAN IP, allows override with availability check
 2. **Swap creation**: Ensures 4GB swap file exists
 3. **APT packages**: Two-pass install (build tools, then runtime deps)
-4. **Node.js**: Installs Node 18.x LTS via NodeSource
-5. **Python environment**: Creates venv, installs pinned packages with --prefer-binary
-6. **React build**: Builds frontend, copies to backend/static, prunes artifacts
-7. **Systemd services**: Installs and enables rtltcp.service and scanner.service
-8. **Verification**: Checks service status, prints access URLs
+4. **RTL-SDR udev rules**: Configures device permissions
+5. **Kernel module blacklist**: Blacklists DVB-T drivers that conflict with RTL-SDR
+6. **Node.js**: Installs Node 18.x LTS via NodeSource
+7. **Python environment**: Creates venv, installs pinned packages with --prefer-binary
+8. **React build**: Builds frontend, copies to backend/static, prunes artifacts
+9. **Systemd services**: Installs and enables rtltcp.service and scanner.service
+10. **Verification**: Checks service status, prints access URLs
+
+**IMPORTANT**: After installation completes, **reboot the Pi** for kernel module blacklist to take effect:
+```bash
+sudo reboot
+```
 
 **Expected installation time**: 20-30 minutes on Pi2B
 
