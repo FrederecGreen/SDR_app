@@ -34,38 +34,82 @@ class SignalDetector:
                 sample_rate = "24k"
                 mode = "fm"
             
-            logger.debug(f"Detecting signal on {freq_entry.freq_mhz} MHz ({mode}, {sample_rate})")
+            logger.info(f"Scanning {freq_entry.freq_mhz} MHz (mode: {mode}, rate: {sample_rate}, squelch: {scanner_config.default_squelch_db})")
             
             # Use rtl_fm with squelch for quick signal detection
-            # This is more reliable than rtl_power on Pi2B
-            result = subprocess.run([
-                "timeout", "1",  # 1 second max
+            # Run in background to avoid blocking, kill after timeout
+            cmd = [
                 "rtl_fm",
                 "-d", str(scanner_config.scanner_device),
                 "-f", str(freq_hz),
                 "-M", mode,
                 "-s", sample_rate,
                 "-l", str(scanner_config.default_squelch_db),  # Squelch level
+                "-g", "40",  # Fixed gain
                 "-E", "dc",  # DC blocking
                 "-"
-            ], capture_output=True, text=False, timeout=2)
+            ]
             
-            # Check if rtl_fm produced output (signal present)
-            # If squelch opens, rtl_fm outputs audio samples
-            output_size = len(result.stdout) if result.stdout else 0
+            logger.debug(f"Running: {' '.join(cmd)}")
+            
+            # Start process
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                preexec_fn=os.setsid  # Create process group for cleanup
+            )
+            
+            # Read output for 1 second
+            import time
+            start_time = time.time()
+            output_data = b""
+            
+            while time.time() - start_time < 1.0:
+                try:
+                    chunk = process.stdout.read(4096)
+                    if chunk:
+                        output_data += chunk
+                    else:
+                        break
+                except:
+                    break
+            
+            # Kill process and wait
+            try:
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                process.wait(timeout=1)
+            except:
+                try:
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    process.wait(timeout=1)
+                except:
+                    pass
+            
+            # Check stderr for errors
+            stderr_output = ""
+            if process.stderr:
+                try:
+                    stderr_output = process.stderr.read().decode('utf-8', errors='ignore')
+                    if stderr_output and len(stderr_output) > 0:
+                        logger.debug(f"rtl_fm stderr: {stderr_output[:200]}")
+                except:
+                    pass
+            
+            output_size = len(output_data)
             
             # If we got significant audio output, signal is present
-            # Typical: silence = 0 bytes, signal = thousands of bytes in 1 second
-            has_signal = output_size > 5000  # At least 5KB of audio data
+            # FM broadcasts produce lots of data even with squelch
+            # Threshold: >5KB indicates signal (FM broadcast produces 24KB/sec at 24kHz sample rate)
+            has_signal = output_size > 5000
             
             if has_signal:
                 # Estimate signal strength based on output size
-                # This is rough but works for presence detection
-                estimated_strength = -40.0 + (output_size / 10000)  # Rough estimate
-                logger.info(f"Signal detected on {freq_entry.freq_mhz} MHz: {output_size} bytes, ~{estimated_strength:.1f}dB")
+                estimated_strength = -40.0 + (output_size / 10000)
+                logger.info(f"✓ SIGNAL DETECTED: {freq_entry.freq_mhz} MHz - {output_size} bytes (~{estimated_strength:.1f}dB)")
                 return True, estimated_strength
             else:
-                logger.debug(f"No signal on {freq_entry.freq_mhz} MHz (output: {output_size} bytes)")
+                logger.debug(f"✗ No signal: {freq_entry.freq_mhz} MHz ({output_size} bytes)")
                 return False, self.noise_floor_db
             
         except subprocess.TimeoutExpired:
