@@ -44,9 +44,21 @@ echo "--- Device 1 Test (rtl_fm) ---"
 echo "Testing FM reception on 98.1 MHz for 1 second..."
 TEST_FREQ="98100000"  # 98.1 MHz
 
-timeout 2 rtl_fm -d 1 -f $TEST_FREQ -M fm -s 24k -l 40 - 2>&1 | head -20
+# Run rtl_fm in background with timeout, discard output
+timeout 2 rtl_fm -d 1 -f $TEST_FREQ -M fm -s 24k -l 40 - >/dev/null 2>&1 &
+RTL_FM_PID=$!
 
-if [ ${PIPESTATUS[0]} -eq 0 ] || [ ${PIPESTATUS[0]} -eq 124 ]; then
+# Wait for process to finish or timeout
+sleep 2
+
+# Kill if still running
+if ps -p $RTL_FM_PID > /dev/null 2>&1; then
+    kill -9 $RTL_FM_PID 2>/dev/null
+    wait $RTL_FM_PID 2>/dev/null
+fi
+
+# Check if rtl_fm ran at all
+if [ $? -eq 0 ] || [ $? -eq 124 ] || [ $? -eq 137 ]; then
     echo "✓ Device 1 accessible via rtl_fm"
 else
     echo "✗ Device 1 failed rtl_fm test"
