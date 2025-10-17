@@ -184,6 +184,11 @@ When scanning a known FM broadcast (e.g., 98.1 MHz):
    - Improved rtl_fm test with setsid and process group killing
    - Improved audio pipeline test with forced cleanup
 
+3. `/app/SDR_app/install.sh`
+   - Added kernel module blacklist creation
+   - Automatic initramfs update
+   - Immediate module unloading during install
+
 ---
 
 ## Next Steps (Phase 3 & 4)
