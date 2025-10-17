@@ -18,48 +18,61 @@ class SignalDetector:
         
         Returns: (has_signal, signal_strength_db)
         
-        Uses rtl_power for quick power measurement.
+        Uses rtl_fm with squelch-based detection (more reliable than rtl_power).
         """
         try:
             freq_hz = int(freq_entry.freq_mhz * 1e6)
             
-            # Use rtl_power for quick scan
-            # Scan narrow range around frequency for 0.1 seconds
+            # Determine sample rate based on modulation
+            if freq_entry.mode.value == "wfm":
+                sample_rate = "200k"
+                mode = "wbfm"
+            elif freq_entry.mode.value == "am":
+                sample_rate = "24k"
+                mode = "am"
+            else:  # fm, nfm
+                sample_rate = "24k"
+                mode = "fm"
+            
+            logger.debug(f"Detecting signal on {freq_entry.freq_mhz} MHz ({mode}, {sample_rate})")
+            
+            # Use rtl_fm with squelch for quick signal detection
+            # This is more reliable than rtl_power on Pi2B
             result = subprocess.run([
-                "rtl_power",
+                "timeout", "1",  # 1 second max
+                "rtl_fm",
                 "-d", str(scanner_config.scanner_device),
-                "-f", f"{freq_hz}:{freq_hz}:1k",  # Single bin
-                "-i", "0.1",  # 100ms integration
-                "-1",  # Single shot
-                "-",  # Output to stdout
-            ], capture_output=True, text=True, timeout=2)
+                "-f", str(freq_hz),
+                "-M", mode,
+                "-s", sample_rate,
+                "-l", str(scanner_config.default_squelch_db),  # Squelch level
+                "-E", "dc",  # DC blocking
+                "-"
+            ], capture_output=True, text=False, timeout=2)
             
-            if result.returncode == 0 and result.stdout:
-                # Parse rtl_power output
-                # Format: date, time, hz_low, hz_high, hz_step, samples, dB, dB, ...
-                lines = result.stdout.strip().split('\n')
-                if lines:
-                    parts = lines[-1].split(',')
-                    if len(parts) >= 7:
-                        # Get power measurement (7th field onward)
-                        power_values = [float(p.strip()) for p in parts[6:] if p.strip()]
-                        if power_values:
-                            avg_power = sum(power_values) / len(power_values)
-                            
-                            # Simple threshold: signal if power > noise floor + squelch
-                            threshold = self.noise_floor_db + (scanner_config.default_squelch_db / 2)
-                            has_signal = avg_power > threshold
-                            
-                            return has_signal, avg_power
+            # Check if rtl_fm produced output (signal present)
+            # If squelch opens, rtl_fm outputs audio samples
+            output_size = len(result.stdout) if result.stdout else 0
             
-            # Fallback: assume no signal
-            return False, self.noise_floor_db
+            # If we got significant audio output, signal is present
+            # Typical: silence = 0 bytes, signal = thousands of bytes in 1 second
+            has_signal = output_size > 5000  # At least 5KB of audio data
+            
+            if has_signal:
+                # Estimate signal strength based on output size
+                # This is rough but works for presence detection
+                estimated_strength = -40.0 + (output_size / 10000)  # Rough estimate
+                logger.info(f"Signal detected on {freq_entry.freq_mhz} MHz: {output_size} bytes, ~{estimated_strength:.1f}dB")
+                return True, estimated_strength
+            else:
+                logger.debug(f"No signal on {freq_entry.freq_mhz} MHz (output: {output_size} bytes)")
+                return False, self.noise_floor_db
             
         except subprocess.TimeoutExpired:
             logger.warning(f"Signal detection timeout on {freq_entry.freq_mhz} MHz")
             return False, self.noise_floor_db
         except Exception as e:
-            logger.error(f"Signal detection error on {freq_entry.freq_mhz} MHz: {e}")
+            logger.error(f"Signal detection error on {freq_entry.freq_mhz} MHz: {e}", exc_info=True)
             return False, self.noise_floor_db
     
     def detect_ctcss(self, audio_chunk_path: str) -> float:
