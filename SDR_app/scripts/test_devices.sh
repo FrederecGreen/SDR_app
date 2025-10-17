@@ -73,8 +73,20 @@ echo "Testing complete pipeline: rtl_fm → ffmpeg → opus"
 TEST_FILE="/tmp/sdr_test_$(date +%s).ogg"
 
 echo "Recording 3 seconds of 98.1 MHz FM..."
-timeout 5 rtl_fm -d 1 -f $TEST_FREQ -M fm -s 24k -r 48k -g 40 - 2>/dev/null | \
-    timeout 4 ffmpeg -f s16le -ar 48k -ac 1 -i - -t 3 -c:a libopus -b:a 64k "$TEST_FILE" -y 2>&1 | tail -5
+
+# Start rtl_fm in a new session
+setsid rtl_fm -d 1 -f $TEST_FREQ -M fm -s 24k -r 48k -g 40 - 2>/dev/null | \
+    ffmpeg -f s16le -ar 48k -ac 1 -i - -t 3 -c:a libopus -b:a 64k "$TEST_FILE" -y 2>&1 | tail -5 &
+
+PIPELINE_PID=$!
+
+# Wait for ffmpeg to finish (max 6 seconds)
+timeout 6 bash -c "wait $PIPELINE_PID" 2>/dev/null || true
+
+# Ensure all related processes are killed
+pkill -TERM -f "rtl_fm.*-d 1.*-f $TEST_FREQ" 2>/dev/null || true
+sleep 0.5
+pkill -KILL -f "rtl_fm.*-d 1.*-f $TEST_FREQ" 2>/dev/null || true
 
 if [ -f "$TEST_FILE" ]; then
     SIZE=$(stat -f%z "$TEST_FILE" 2>/dev/null || stat -c%s "$TEST_FILE" 2>/dev/null)
