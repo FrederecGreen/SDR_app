@@ -84,6 +84,67 @@ if [ "$(whoami)" != "pi" ]; then
     error_exit "This script must be run as user 'pi'"
 fi
 
+# Fix nested directory structure if present
+CURRENT_DIR="$(pwd)"
+log_info "Current directory: ${CURRENT_DIR}"
+
+# Check if we're in a nested SDR_app/SDR_app situation
+if [[ "$CURRENT_DIR" == */SDR_app/SDR_app ]]; then
+    log_warning "Detected nested SDR_app directory structure"
+    log_info "Fixing directory structure..."
+    
+    # Get the parent directory (should be /home/pi/SDR_app)
+    PARENT_DIR="$(dirname "$CURRENT_DIR")"
+    
+    # Create a temporary directory name
+    TEMP_DIR="${PARENT_DIR}_temp_$$"
+    
+    # Move current directory to temp location
+    log_info "Moving ${CURRENT_DIR} to ${TEMP_DIR}"
+    mv "$CURRENT_DIR" "$TEMP_DIR"
+    
+    # Remove the now-empty parent SDR_app directory
+    log_info "Removing empty ${PARENT_DIR}"
+    rmdir "$PARENT_DIR" 2>/dev/null || rm -rf "$PARENT_DIR"
+    
+    # Move temp directory to correct location
+    log_info "Moving ${TEMP_DIR} to ${PARENT_DIR}"
+    mv "$TEMP_DIR" "$PARENT_DIR"
+    
+    # Change to correct directory
+    cd "$PARENT_DIR" || error_exit "Failed to change to ${PARENT_DIR}"
+    
+    log_success "Directory structure fixed! Now in: $(pwd)"
+    echo ""
+    echo "✓ Nested directory issue resolved"
+    echo "✓ Continuing installation from: ${PARENT_DIR}"
+    echo ""
+    sleep 2
+elif [[ "$CURRENT_DIR" != */SDR_app ]]; then
+    log_warning "Not running from SDR_app directory"
+    log_warning "Current location: ${CURRENT_DIR}"
+    
+    # Check if install.sh exists here
+    if [ ! -f "install.sh" ]; then
+        error_exit "install.sh not found. Please run from SDR_app directory."
+    fi
+    
+    log_info "install.sh found, assuming correct location"
+else
+    log_info "Directory structure looks correct"
+fi
+
+# Update BASE_DIR to current directory after potential fix
+BASE_DIR="$(pwd)"
+LOGS_DIR="${BASE_DIR}/logs"
+INSTALL_LOG="${LOGS_DIR}/install.log"
+VENV_DIR="${BASE_DIR}/venv"
+
+# Recreate logs directory in case we moved
+mkdir -p "$LOGS_DIR"
+
+log_info "Base directory set to: ${BASE_DIR}"
+
 # Detect current IP
 log_info "Detecting network configuration..."
 DETECTED_IP=$(hostname -I | awk '{print $1}')
