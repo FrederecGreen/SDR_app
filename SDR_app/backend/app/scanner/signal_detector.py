@@ -2,6 +2,9 @@
 import subprocess
 import logging
 import re
+import os
+import signal
+import time
 from backend.app.config import scanner_config
 from backend.app.models import FrequencyEntry
 
