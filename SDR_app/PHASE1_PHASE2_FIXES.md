@@ -164,7 +164,7 @@ sudo tail -f /var/log/supervisor/backend.*.log
 # - Successful service startup
 ```
 
-### 2. Run Device Test Script
+### 3. Run Device Test Script
 ```bash
 cd /home/pi/SDR_app
 ./scripts/test_devices.sh
